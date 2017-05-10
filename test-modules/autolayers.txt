@@ -1,0 +1,4 @@
+
+outA|libs/guava-20.0.jar
+(0)outB|libs/guava-14.0.jar
+(1,2)outApp
