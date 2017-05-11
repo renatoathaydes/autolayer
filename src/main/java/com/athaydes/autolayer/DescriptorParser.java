@@ -31,7 +31,7 @@ public class DescriptorParser {
         }
 
         Pattern descriptorLinePattern = Pattern.compile(
-                "(\\(\\s*(?<layers>\\d+(\\s*,\\d+\\s*)?)?\\s*\\)\\s*)?(?<files>.+)" );
+                "(\\(\\s*(?<layers>\\d+(\\s*,\\s*\\d+\\s*)?)?\\s*\\)\\s*)?(?<files>.+)" );
 
         AutoLayer[] layers = new AutoLayer[ entries.size() + 1 ];
 

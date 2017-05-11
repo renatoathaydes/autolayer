@@ -46,7 +46,7 @@ public class DescriptorParserTest {
                 "(0)abc.jar",
                 "(1)def.jar|ghi.jar",
                 "(1)jkl.jar",
-                "(2,3)mno.jar" );
+                "(2, 3)mno.jar" );
 
         AutoLayer[] layers = new DescriptorParser().parse( "descriptor.file", lines );
 
