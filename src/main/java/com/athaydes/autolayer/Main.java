@@ -20,15 +20,21 @@ public class Main {
     private static final Logger log = Logger.getLogger( Main.class.getName() );
 
     public static void main( String[] args ) throws Throwable {
-        if ( args.length != 2 ) {
-            System.err.println( "Please provide a auto-layer descriptor and a runnable module/class as arguments." );
+        if ( args.length == 1 && ( args[ 0 ].equals( "-h" ) || args[ 0 ].equals( "--help" ) ) ) {
+            printUsage();
             return;
+        }
+
+        if ( args.length < 2 ) {
+            System.err.println( "Missing arguments" );
+            printUsage();
+            System.exit( 1 );
         }
 
         File descriptor = new File( args[ 0 ] );
         if ( !descriptor.isFile() ) {
             System.err.println( "Not a file: " + descriptor.getAbsolutePath() );
-            return;
+            System.exit( 2 );
         }
 
         String[] mainModuleAndClass = args[ 1 ].split( "/" );
@@ -45,7 +51,8 @@ public class Main {
                 System.err.println( "Invalid class name (missing package): " + mainClass );
             }
         } else {
-            System.err.println( "Invalid module/class: " + args[ 2 ] );
+            System.err.println( "Invalid module/class: " + args[ 1 ] );
+            System.exit( 3 );
             return;
         }
 
@@ -62,12 +69,26 @@ public class Main {
         }
 
         if ( module == null ) {
-            throw new RuntimeException( "Could not find module: " + moduleName );
+            System.err.println( "Could not find module: " + moduleName );
+            return;
         }
 
-        runMainClass( mainClass, module );
+        String[] programArgs = Arrays.stream( args ).skip( 2 ).toArray( String[]::new );
+
+        runMainClass( mainClass, module, programArgs );
 
         log.fine( "AutoLayers main() exiting" );
+    }
+
+    private static void printUsage() {
+        System.out.println( "Usage:" );
+        System.out.println();
+        System.out.println( Main.class.getName() + " --help -h" );
+        System.out.println( "    Show help/usage." );
+        System.out.println();
+        System.out.println( Main.class.getName() + " layers-descriptor module-name/main-class [program-args]" );
+        System.out.println( "    Using the provided layers-descriptor file, run module-name/main-class, passing" +
+                " any further arguments to the program." );
     }
 
     private static String extractPackageName( String mainClass ) {
@@ -118,10 +139,12 @@ public class Main {
         return module;
     }
 
-    private static void runMainClass( String mainClass, Module module ) throws Exception {
+    private static void runMainClass( String mainClass,
+                                      Module module,
+                                      String[] programArgs ) throws Exception {
         Class<?> main = module.getClassLoader().loadClass( mainClass );
         Method mainMethod = main.getMethod( "main", String[].class );
-        mainMethod.invoke( main, ( Object ) new String[ 0 ] );
+        mainMethod.invoke( main, ( Object ) programArgs );
     }
 
 }
