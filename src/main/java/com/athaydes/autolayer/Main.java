@@ -21,8 +21,8 @@ public class Main {
     private static final Logger log = Logger.getLogger( Main.class.getName() );
 
     public static void main( String[] args ) throws Throwable {
-        if ( args.length != 3 ) {
-            System.err.println( "Please provide a auto-layer descriptor and a runnable module and class as arguments." );
+        if ( args.length != 2 ) {
+            System.err.println( "Please provide a auto-layer descriptor and a runnable module/class as arguments." );
             return;
         }
 
@@ -32,8 +32,23 @@ public class Main {
             return;
         }
 
-        String moduleName = args[ 1 ];
-        String mainClass = args[ 2 ];
+        String[] mainModuleAndClass = args[ 1 ].split( "/" );
+        String moduleName;
+        String mainClass;
+        String packageName;
+
+        if ( mainModuleAndClass.length == 2 ) {
+            moduleName = mainModuleAndClass[ 0 ];
+            mainClass = mainModuleAndClass[ 1 ];
+            packageName = extractPackageName( mainClass );
+
+            if ( packageName.isEmpty() ) {
+                System.err.println( "Invalid class name (missing package): " + mainClass );
+            }
+        } else {
+            System.err.println( "Invalid module/class: " + args[ 2 ] );
+            return;
+        }
 
         AutoLayer[] layers = new DescriptorParser().parse( descriptor );
 
@@ -76,7 +91,7 @@ public class Main {
                         .orElseThrow( () -> new RuntimeException( "Auto-layer contains module, " +
                                 "but Java Layer does not: " + moduleName ) );
 
-                controller.addOpens( module, "com.app", Main.class.getModule() );
+                controller.addOpens( module, packageName, Main.class.getModule() );
             }
 
             parentLayer = autoLayer;
@@ -99,6 +114,11 @@ public class Main {
         mainMethod.invoke( main, ( Object ) new String[ 0 ] );
 
         log.fine( "AutoLayers main() exiting" );
+    }
+
+    private static String extractPackageName( String mainClass ) {
+        int index = mainClass.lastIndexOf( '.' );
+        return mainClass.substring( 0, Math.max( index, 0 ) );
     }
 
 }
