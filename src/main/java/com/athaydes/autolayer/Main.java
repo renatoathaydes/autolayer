@@ -6,7 +6,6 @@ import java.lang.module.ModuleFinder;
 import java.lang.reflect.Layer;
 import java.lang.reflect.Method;
 import java.lang.reflect.Module;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
@@ -52,50 +51,7 @@ public class Main {
 
         AutoLayer[] layers = new DescriptorParser().parse( descriptor );
 
-        AutoLayer parentLayer = null;
-
-        int i = 1;
-
-        Module module = null;
-
-        for (AutoLayer autoLayer : layers) {
-            if ( parentLayer == null ) {
-                parentLayer = autoLayer; // root layer
-                continue;
-            }
-
-            if ( log.isLoggable( Level.FINE ) ) {
-                log.fine( "Layer " + i++ + ": " + autoLayer + ", modules " + autoLayer.getModuleNames() );
-            }
-
-            List<Layer> parents = new ArrayList<>( autoLayer.getParents().length );
-            for (AutoLayer parent : autoLayer.getParents()) {
-                parents.add( parent.getJavaLayer() );
-            }
-
-            List<Configuration> parentConfigurations = parents.stream()
-                    .map( Layer::configuration )
-                    .collect( Collectors.toList() );
-
-            Configuration cf = Configuration.resolve(
-                    autoLayer.getModuleFinder(), parentConfigurations, ModuleFinder.of(),
-                    autoLayer.getModuleNames() );
-
-            Layer.Controller controller = Layer.defineModulesWithOneLoader( cf, parents, parentLayer.getLoader() );
-            Layer layer = controller.layer();
-
-            autoLayer.setJavaLayer( layer );
-
-            if ( autoLayer.getModuleNames().contains( moduleName ) ) {
-                module = layer.findModule( moduleName )
-                        .orElseThrow( () -> new RuntimeException( "Auto-layer contains module, " +
-                                "but Java Layer does not: " + moduleName ) );
-
-                controller.addOpens( module, packageName, Main.class.getModule() );
-            }
-
-            parentLayer = autoLayer;
-        }
+        Module module = createJavaLayersAndGetModule( moduleName, packageName, layers );
 
         Layer[] javaLayers = Arrays.stream( layers )
                 .map( AutoLayer::getJavaLayer )
@@ -109,9 +65,7 @@ public class Main {
             throw new RuntimeException( "Could not find module: " + moduleName );
         }
 
-        Class<?> main = module.getClassLoader().loadClass( mainClass );
-        Method mainMethod = main.getMethod( "main", String[].class );
-        mainMethod.invoke( main, ( Object ) new String[ 0 ] );
+        runMainClass( mainClass, module );
 
         log.fine( "AutoLayers main() exiting" );
     }
@@ -119,6 +73,55 @@ public class Main {
     private static String extractPackageName( String mainClass ) {
         int index = mainClass.lastIndexOf( '.' );
         return mainClass.substring( 0, Math.max( index, 0 ) );
+    }
+
+    private static Module createJavaLayersAndGetModule( String moduleName,
+                                                        String packageName,
+                                                        AutoLayer[] layers ) {
+        Module module = null;
+
+        for (int index = 1; index < layers.length; index++) {
+            AutoLayer autoLayer = layers[ index ];
+
+            if ( log.isLoggable( Level.FINE ) ) {
+                log.fine( "Layer " + index + ": " + autoLayer + ", modules " + autoLayer.getModuleNames() );
+            }
+
+            List<Layer> parents = Arrays.stream( autoLayer.getParents() )
+                    .map( AutoLayer::getJavaLayer )
+                    .collect( Collectors.toList() );
+
+            List<Configuration> parentConfigurations = parents.stream()
+                    .map( Layer::configuration )
+                    .collect( Collectors.toList() );
+
+            Configuration cf = Configuration.resolve(
+                    autoLayer.getModuleFinder(), parentConfigurations, ModuleFinder.of(),
+                    autoLayer.getModuleNames() );
+
+            Layer.Controller controller = Layer.defineModulesWithOneLoader(
+                    cf, parents, layers[ index - 1 ].getLoader() );
+
+            Layer layer = controller.layer();
+
+            autoLayer.setJavaLayer( layer );
+
+            if ( autoLayer.getModuleNames().contains( moduleName ) ) {
+                module = layer.findModule( moduleName )
+                        .orElseThrow( () -> new RuntimeException( "Auto-layer contains module, " +
+                                "but Java Layer does not: " + moduleName ) );
+
+                controller.addOpens( module, packageName, Main.class.getModule() );
+            }
+        }
+
+        return module;
+    }
+
+    private static void runMainClass( String mainClass, Module module ) throws Exception {
+        Class<?> main = module.getClassLoader().loadClass( mainClass );
+        Method mainMethod = main.getMethod( "main", String[].class );
+        mainMethod.invoke( main, ( Object ) new String[ 0 ] );
     }
 
 }
